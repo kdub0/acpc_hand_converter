@@ -123,6 +123,15 @@ def main():
                         hand_players[hero],
                         hand.hands[hero][0], hand.hands[hero][1],
                 )
+            else:
+                print 'Dealt to %s [%s %s]' % (
+                        hand_players[1-dealer],
+                        hand.hands[1-dealer][0], hand.hands[1-dealer][1],
+                )
+                print 'Dealt to %s [%s %s]' % (
+                        hand_players[dealer],
+                        hand.hands[dealer][0], hand.hands[dealer][1],
+                )
 
             def summary(name1, outcome1, name2, outcome2, pot):
                 if name2 == players[0]:
