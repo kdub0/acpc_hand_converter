@@ -1,4 +1,4 @@
-import argparse, collections, itertools, rank, re, sys
+import argparse, collections, datetime, itertools, rank, re, sys
 
 HandHistory = collections.namedtuple(
         'HandHistory',
@@ -47,6 +47,10 @@ def main():
             help='Big blind'
     )
     parser.add_argument(
+            '--hand_time', type=str, default=None,
+            help='Time hands took place'
+    )
+    parser.add_argument(
             '--hero', type=str, default=None,
             help='Name of Hero'
     )
@@ -75,6 +79,23 @@ def main():
     player_map = dict([x.split('=') for x in args.player_map])
     args.hero = player_map.get(args.hero, args.hero)
 
+    if args.hand_time:
+        hand_time = args.hand_time
+    else:
+        # convert to Eastern Time
+        # from (http://stackoverflow.com/questions/11710469/how-to-get-python-to-display-current-time-eastern)
+        t = datetime.datetime.utcnow() + datetime.timedelta(hours=-5)
+        # daylight savings starts on 2nd Sunday of March
+        d = datetime.datetime(t.year, 3, 8)
+        dston = d + datetime.timedelta(days=6-d.weekday())
+        # daylight savings stops on 1st Sunday of Nov
+        d = datetime.datetime(t.year, 11, 1)
+        dstoff = d + datetime.timedelta(days=6-d.weekday())
+        if dston <= t.replace(tzinfo=None) < dstoff:
+            t += datetime.timedelta(hours=1)
+
+        hand_time = t.strftime('%Y/%m/%d %H:%M:%S ET')
+
     index = args.start_index
     for line in sys.stdin.xreadlines():
         hand = parse_HandHistory(line)
@@ -102,8 +123,8 @@ def main():
                 print
 
             # add in time
-            print 'PokerStars Hand #%d: Hold\'em No Limit ($%d/$%d USD)' % (
-                    index, args.small_blind, args.big_blind
+            print 'PokerStars Hand #%d:  Hold\'em No Limit ($%d/$%d USD) - %s' % (
+                    index, args.small_blind, args.big_blind, hand_time
             )
 
             print 'Table \'%s\' heads-up Seat #%d is the button' % (
