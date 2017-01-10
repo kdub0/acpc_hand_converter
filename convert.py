@@ -74,6 +74,7 @@ def main():
             '--start_index', type=int, default=1,
             help='Index of first hand'
     )
+    parser.set_defaults(unix=False)
     args = parser.parse_args()
 
     player_map = dict([x.split('=') for x in args.player_map])
@@ -174,6 +175,65 @@ def main():
                         outcome2
                 )
 
+            def showdown():
+                player = caller
+                opponent = 1 - caller
+
+                print '*** SHOW DOWN ***'
+
+                board_cards = list(itertools.chain(*hand.board))
+                opponent_rank, opponent_rank_name = rank.high(
+                        rank.string_to_cards(
+                            ''.join(hand.hands[opponent]+board_cards)
+                        )
+                )
+                print '%s: shows [%s %s] (%s)' % (
+                        hand_players[opponent],
+                        hand.hands[opponent][0], hand.hands[opponent][1],
+                        opponent_rank_name
+                )
+
+                player_rank, player_rank_name = rank.high(
+                        rank.string_to_cards(
+                            ''.join(hand.hands[player]+board_cards)
+                        )
+                )
+                print '%s: shows [%s %s] (%s)' % (
+                        hand_players[player],
+                        hand.hands[player][0], hand.hands[player][1],
+                        player_rank_name
+                )
+
+                win_amount = pot[player] + pot[opponent]
+                outcome = win_amount
+                if opponent_rank == player_rank:
+                    win_amount = win_amount / 2
+
+                if opponent_rank >= player_rank:
+                    print '%s collected $%d from pot' % (
+                            hand_players[opponent],
+                            win_amount
+                    )
+                if player_rank >= opponent_rank:
+                    print '%s collected $%d from pot' % (
+                            hand_players[player],
+                            win_amount
+                    )
+
+                player_outcome = 'showed [%s %s] and %s with %s' % (
+                        hand.hands[player][0], hand.hands[player][1],
+                        'won ($%d)' % win_amount if player_rank >= opponent_rank else 'lost',
+                        player_rank_name
+                )
+                opponent_outcome = 'showed [%s %s] and %s with %s' % (
+                        hand.hands[opponent][0], hand.hands[opponent][1],
+                        'won ($%d)' % win_amount if opponent_rank >= player_rank else 'lost',
+                        opponent_rank_name
+                )
+                summary(hand_players[player], player_outcome,
+                    hand_players[opponent], opponent_outcome,
+                    outcome)
+
             pot = [args.big_blind, args.small_blind]
             for rnd in range(1+len(hand.board)):
                 if rnd > 0:
@@ -185,6 +245,7 @@ def main():
                 player = 1 if rnd == 0 else 0
                 betting = hand.betting[rnd] if rnd < len(hand.betting) else ''
                 first_action = True
+                initial_pot = pot[1-player] if rnd > 0 else 0
 
                 while betting != '':
                     opponent = 1 - player
@@ -225,62 +286,7 @@ def main():
                                     ' and is all-in' if pot[opponent] == args.stack_size else ''
                             )
                         pot[player] = pot[opponent]
-
-                        if rnd == 3 and not first_action:
-                            print '*** SHOW DOWN ***'
-
-                            board_cards = list(itertools.chain(*hand.board))
-                            opponent_rank, opponent_rank_name = rank.high(
-                                    rank.string_to_cards(
-                                        ''.join(hand.hands[opponent]+board_cards)
-                                    )
-                            )
-                            print '%s: shows [%s %s] (%s)' % (
-                                    hand_players[opponent],
-                                    hand.hands[opponent][0], hand.hands[opponent][1],
-                                    opponent_rank_name
-                            )
-
-                            player_rank, player_rank_name = rank.high(
-                                    rank.string_to_cards(
-                                        ''.join(hand.hands[player]+board_cards)
-                                    )
-                            )
-                            print '%s: shows [%s %s] (%s)' % (
-                                    hand_players[player],
-                                    hand.hands[player][0], hand.hands[player][1],
-                                    player_rank_name
-                            )
-
-                            win_amount = pot[player] + pot[opponent]
-                            outcome = win_amount
-                            if opponent_rank == player_rank:
-                                win_amount = win_amount / 2
-
-                            if opponent_rank >= player_rank:
-                                print '%s collected $%d from pot' % (
-                                        hand_players[opponent],
-                                        win_amount
-                                )
-                            if player_rank >= opponent_rank:
-                                print '%s collected $%d from pot' % (
-                                        hand_players[player],
-                                        win_amount
-                                )
-
-                            player_outcome = 'showed [%s %s] and %s with %s' % (
-                                    hand.hands[player][0], hand.hands[player][1],
-                                    'won ($%d)' % win_amount if player_rank >= opponent_rank else 'lost',
-                                    player_rank_name
-                            )
-                            opponent_outcome = 'showed [%s %s] and %s with %s' % (
-                                    hand.hands[opponent][0], hand.hands[opponent][1],
-                                    'won ($%d)' % win_amount if opponent_rank >= player_rank else 'lost',
-                                    opponent_rank_name
-                            )
-                            summary(hand_players[player], player_outcome,
-                                    hand_players[opponent], opponent_outcome,
-                                    outcome)
+                        caller = player
 
                     elif betting[0] == 'r':
                         betting = betting[1:]
@@ -288,11 +294,18 @@ def main():
                         betting = betting[len(size):]
                         size = int(size)
 
-                        print '%s: raises $%d to $%d%s' % (
-                                hand_players[player],
-                                size - pot[opponent], size,
-                                ' and is all-in' if size == args.stack_size else ''
-                        )
+                        if pot[player] == initial_pot and first_action:
+                            print '%s: bets $%d%s' % (
+                                    hand_players[player],
+                                    size - initial_pot,
+                                    ' and is all-in' if size == args.stack_size else ''
+                            )
+                        else:
+                            print '%s: raises $%d to $%d%s' % (
+                                    hand_players[player],
+                                    size - pot[opponent], size - initial_pot,
+                                    ' and is all-in' if size == args.stack_size else ''
+                            )
                         pot[player] = size
                     else:
                         assert False
@@ -300,6 +313,8 @@ def main():
                     player = (1 + player) % 2
                     first_action = False
 
+            if len(hand.betting) == 4 and (hand.betting[3] == '' or hand.betting[3][-1] == 'c'):
+                showdown()
             index += 1
 
 if __name__ == '__main__':
