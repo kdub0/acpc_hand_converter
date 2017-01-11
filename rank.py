@@ -55,7 +55,7 @@ def _straight(rank_mask):
     straight = 1 if (rank_mask & 0x100f) == 0x100f else 0
     num_ranks = _popcount(rank_mask)
     while num_ranks >= 5:
-        low = _ctz(num_ranks)
+        low = _ctz(rank_mask)
         if (rank_mask>>low & 0x1f) == 0x1f:
             straight = 2 + low
         rank_mask &= rank_mask - 1
