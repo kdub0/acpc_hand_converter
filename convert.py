@@ -2,12 +2,19 @@ import argparse, collections, datetime, itertools, os, rank, re, sys
 
 HandHistory = collections.namedtuple(
         'HandHistory',
-        ['index', 'betting', 'hands', 'board', 'outcome', 'players']
+        ['index', 'betting', 'hands', 'board', 'outcome', 'players', 'time']
 )
 
 def parse_HandHistory(line):
     if len(line) == 0 or line[0] == '#':
         return None
+
+    comment_start = line.find('#')
+    if comment_start >= 0:
+        comment = line[comment_start+1:].strip()
+        line = line[0:comment_start].strip('#')
+    else:
+        comment = ''
 
     fields = line.strip().split(':')
     if len(fields) == 0:
@@ -20,6 +27,8 @@ def parse_HandHistory(line):
 
     if len(fields) != 6:
         raise RuntimeException('Incorrect number of fields')
+
+    time = None
 
     index = int(fields[1])
     betting = fields[2].split('/')
@@ -38,7 +47,13 @@ def parse_HandHistory(line):
     hands = [cards(x) for x in hands]
     board = [cards(x) for x in board]
 
-    return HandHistory(index, betting, hands, board, outcome, players)
+    if comment != '':
+        try:
+            time = datetime.datetime.fromtimestamp(float(comment))
+        except Exception as e:
+            pass
+
+    return HandHistory(index, betting, hands, board, outcome, players, time)
 
 def main():
     parser = argparse.ArgumentParser(description='convert ACPC hand histories to PokerStars format')
@@ -111,6 +126,9 @@ def main():
     for line in log_file.xreadlines():
         hand = parse_HandHistory(line)
         if hand:
+            if hand.time is not None:
+                hand_time = hand.time
+
             if isinstance(hand_time, datetime.datetime):
                 hand_time_str = hand_time.strftime('%Y/%m/%d %H:%M:%S ET')
                 hand_time += datetime.timedelta(minutes=1)
