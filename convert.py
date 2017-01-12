@@ -1,4 +1,4 @@
-import argparse, collections, datetime, itertools, rank, re, sys
+import argparse, collections, datetime, itertools, os, rank, re, sys
 
 HandHistory = collections.namedtuple(
         'HandHistory',
@@ -55,6 +55,10 @@ def main():
             help='Name of Hero'
     )
     parser.add_argument(
+            '--log_file', type=str, default=None,
+            help='Path to log file, if not set uses stdin'
+    )
+    parser.add_argument(
             '--player_map', type=str, default=[], nargs='+',
             help='Map player names (e.g., hyperborian_2pn_2014=Hyperborean)'
     )
@@ -82,6 +86,8 @@ def main():
 
     if args.hand_time:
         hand_time = args.hand_time
+    elif args.log_file:
+        hand_time = datetime.datetime.fromtimestamp(os.stat(args.log_file).st_mtime)
     else:
         # convert to Eastern Time
         # from (http://stackoverflow.com/questions/11710469/how-to-get-python-to-display-current-time-eastern)
@@ -94,13 +100,23 @@ def main():
         dstoff = d + datetime.timedelta(days=6-d.weekday())
         if dston <= t.replace(tzinfo=None) < dstoff:
             t += datetime.timedelta(hours=1)
+        hand_time = t
 
-        hand_time = t.strftime('%Y/%m/%d %H:%M:%S ET')
+    if args.log_file:
+        log_file = open(args.log_file, 'r')
+    else:
+        log_file = sys.stdin
 
     index = args.start_index
-    for line in sys.stdin.xreadlines():
+    for line in log_file.xreadlines():
         hand = parse_HandHistory(line)
         if hand:
+            if isinstance(hand_time, datetime.datetime):
+                hand_time_str = hand_time.strftime('%Y/%m/%d %H:%M:%S ET')
+                hand_time += datetime.timedelta(minutes=1)
+            else:
+                hand_time_str = hand_time
+
             hand_players = [player_map.get(x, x) for x in hand.players]
             if index == args.start_index:
                 players = hand_players
@@ -125,10 +141,10 @@ def main():
 
             # add in time
             print 'PokerStars Hand #%d:  Hold\'em No Limit ($%d/$%d USD) - %s' % (
-                    index, args.small_blind, args.big_blind, hand_time
+                    index, args.small_blind, args.big_blind, hand_time_str
             )
 
-            print 'Table \'%s\' heads-up Seat #%d is the button' % (
+            print 'Table \'%s\' 2-max Seat #%d is the button' % (
                     args.table_name,
                     1 + dealer
             )
