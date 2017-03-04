@@ -287,7 +287,7 @@ def main():
                     if betting[0] == 'f':
                         betting = betting[1:]
                         print '%s: folds' % (hand_players[player])
-                        if pot[player] < pot[opponent] and pot[opponent] > args.big_blind:
+                        if pot[player] < pot[opponent]:
                             print 'Uncalled bet ($%d) returned to %s' % (
                                     pot[opponent] - pot[player],
                                     hand_players[opponent]
