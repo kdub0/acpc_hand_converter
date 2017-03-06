@@ -105,7 +105,7 @@ def high(cards):
         return 3<<26 | top_arg<<13 | _kickers(2, rank_mask & ~(1<<top_arg)), 'three of a kind, %s' % RANK_NAMES[top_arg][1]
 
     if top_count >= 2 and snd_count >= 2:
-        return 1<<26 | (1<<top_arg | 1<<snd_arg)<<13 | _kickers(1, rank_mask & ~(1<<top_arg) & ~(1<<snd_arg)), 'two pair, %s and %s' % (
+        return 2<<26 | (1<<top_arg | 1<<snd_arg)<<13 | _kickers(1, rank_mask & ~(1<<top_arg) & ~(1<<snd_arg)), 'two pair, %s and %s' % (
                 RANK_NAMES[top_arg][1], RANK_NAMES[snd_arg][1]
         )
  
