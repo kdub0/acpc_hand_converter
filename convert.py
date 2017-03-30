@@ -2,10 +2,10 @@ import argparse, collections, datetime, itertools, os, rank, re, sys
 
 HandHistory = collections.namedtuple(
         'HandHistory',
-        ['index', 'betting', 'hands', 'board', 'outcome', 'players', 'time']
+        ['index', 'betting', 'hands', 'board', 'outcome', 'players', 'time', 'stacks', 'blinds']
 )
 
-def parse_HandHistory(line):
+def parse_HandHistory(line, freeze_out=False, stack_size=20000, blinds=[50, 100]):
     if len(line) == 0 or line[0] == '#':
         return None
 
@@ -25,22 +25,32 @@ def parse_HandHistory(line):
     elif fields[0] != 'STATE':
         raise RuntimeError('STATE field invalid')
 
-    if len(fields) != 6:
+    offset = 2 if freeze_out else 0
+    num_fields = 6 + offset
+
+    if len(fields) != num_fields:
         raise RuntimeError('Incorrect number of fields')
 
     time = None
 
+    if freeze_out:
+        stacks = [int(x) for x in fields[2].split('|')]
+        blinds = [int(x) for x in fields[3].split('|')]
+        blinds = [blinds[1], blinds[0]]
+    else:
+        stacks = [stack_size, stack_size]
+
     index = int(fields[1])
-    betting = fields[2].split('/')
-    if fields[3].find('/') >= 0:
-        hands, board = fields[3].split('/', 1)
+    betting = fields[2+offset].split('/')
+    if fields[3+offset].find('/') >= 0:
+        hands, board = fields[3+offset].split('/', 1)
         hands = hands.split('|')
         board = board.split('/')
     else:
-        hands = fields[3].split('|')
+        hands = fields[3+offset].split('|')
         board = []
-    outcome = map(float, fields[4].split('|'))
-    players = fields[5].split('|')
+    outcome = map(float, fields[4+offset].split('|'))
+    players = fields[5+offset].split('|')
 
     def cards(s):
         return [s[i:i+2] for i in range(0, len(s), 2)]
@@ -53,13 +63,17 @@ def parse_HandHistory(line):
         except Exception as e:
             pass
 
-    return HandHistory(index, betting, hands, board, outcome, players, time)
+    return HandHistory(index, betting, hands, board, outcome, players, time, stacks, blinds)
 
 def main():
     parser = argparse.ArgumentParser(description='convert ACPC hand histories to PokerStars format')
     parser.add_argument(
             '--big_blind', type=int, default=100,
             help='Big blind'
+    )
+    parser.add_argument(
+            '--freeze-out', dest='freeze_out', default=False, action='store_true',
+            help='Indicate that logs include stack sizes'
     )
     parser.add_argument(
             '--hand_time', type=str, default=None,
@@ -88,6 +102,14 @@ def main():
     parser.add_argument(
             '--table_name', type=str, default='ACPC Match',
             help='PokerStars table name'
+    )
+    parser.add_argument(
+            '--tournament-name', dest='tournament_name', default=None,
+            help='Tournament name'
+    )
+    parser.add_argument(
+            '--tournament-id', dest='tournament_id', type=int, default=1,
+            help='Tournament id'
     )
     parser.add_argument(
             '--start_index', type=int, default=1,
@@ -122,9 +144,14 @@ def main():
     else:
         log_file = sys.stdin
 
+    if args.tournament_name is not None:
+        tournament = 'Tournament #%d, %s' % (args.tournament_id, args.tournament_name)
+    else:
+        tournament = ''
+
     index = args.start_index
     for line in log_file.xreadlines():
-        hand = parse_HandHistory(line)
+        hand = parse_HandHistory(line, freeze_out=args.freeze_out, stack_size=args.stack_size, blinds=[args.small_blind, args.big_blind])
         if hand:
             if hand.time is not None:
                 hand_time = hand.time
@@ -158,8 +185,8 @@ def main():
                 print
 
             # add in time
-            print 'PokerStars Hand #%d:  Hold\'em No Limit ($%d/$%d USD) - %s' % (
-                    index, args.small_blind, args.big_blind, hand_time_str
+            print 'PokerStars Hand #%d: %s Hold\'em No Limit ($%d/$%d USD) - %s' % (
+                    index, tournament, hand.blinds[0], hand.blinds[1], hand_time_str
             )
 
             print 'Table \'%s\' 2-max Seat #%d is the button' % (
@@ -167,11 +194,11 @@ def main():
                     1 + dealer
             )
 
-            print 'Seat 1: %s ($%d in chips)' % (players[0], args.stack_size)
-            print 'Seat 2: %s ($%d in chips)' % (players[1], args.stack_size)
+            print 'Seat 1: %s ($%d in chips)' % (players[0], hand.stacks[1-dealer])
+            print 'Seat 2: %s ($%d in chips)' % (players[1], hand.stacks[dealer])
 
-            print '%s: posts small blind $%d' % (hand_players[1], args.small_blind)
-            print '%s: posts big blind $%d' % (hand_players[0], args.big_blind)
+            print '%s: posts small blind $%d' % (hand_players[1], hand.blinds[0])
+            print '%s: posts big blind $%d' % (hand_players[0], hand.blinds[1])
 
             print '*** HOLE CARDS ***'
             if hero is not None:
@@ -268,7 +295,7 @@ def main():
                     hand_players[opponent], opponent_outcome,
                     outcome)
 
-            pot = [args.big_blind, args.small_blind]
+            pot = [hand.blinds[1], hand.blinds[0]]
             for rnd in range(1+len(hand.board)):
                 if rnd > 0:
                     print '*** %s **** [%s]' % (
@@ -317,9 +344,14 @@ def main():
                             print '%s: calls $%d%s' % (
                                     hand_players[player],
                                     pot[opponent] - pot[player],
-                                    ' and is all-in' if pot[opponent] == args.stack_size else ''
+                                    ' and is all-in' if pot[opponent] >= hand.stacks[player] else ''
                             )
-                        pot[player] = pot[opponent]
+                            if pot[opponent] > hand.stacks[player]:
+                                print 'Uncalled bet ($%d) returned to %s' % (
+                                        pot[opponent] - hand.stacks[player],
+                                        hand_players[opponent]
+                                )
+                        pot[player] = min(hand.stacks[player], pot[opponent])
                         caller = player
 
                     elif betting[0] == 'r':
@@ -332,13 +364,13 @@ def main():
                             print '%s: bets $%d%s' % (
                                     hand_players[player],
                                     size - initial_pot,
-                                    ' and is all-in' if size == args.stack_size else ''
+                                    ' and is all-in' if size == hand.stacks[player] else ''
                             )
                         else:
                             print '%s: raises $%d to $%d%s' % (
                                     hand_players[player],
                                     size - pot[opponent], size - initial_pot,
-                                    ' and is all-in' if size == args.stack_size else ''
+                                    ' and is all-in' if size == hand.stacks[player] else ''
                             )
                         pot[player] = size
                     else:
