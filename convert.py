@@ -18,15 +18,15 @@ def parse_HandHistory(line):
 
     fields = line.strip().split(':')
     if len(fields) == 0:
-        raise RuntimeException('Incorrect number of fields')
+        raise RuntimeError('Incorrect number of fields')
 
     if fields[0] == 'SCORE':
         return None
     elif fields[0] != 'STATE':
-        raise RuntimeException('STATE field invalid')
+        raise RuntimeError('STATE field invalid')
 
     if len(fields) != 6:
-        raise RuntimeException('Incorrect number of fields')
+        raise RuntimeError('Incorrect number of fields')
 
     time = None
 
