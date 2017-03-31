@@ -140,7 +140,10 @@ def main():
     args.hero = player_map.get(args.hero, args.hero)
 
     if args.hand_time:
-        hand_time = args.hand_time
+        try:
+            hand_time = datetime.datetime.strptime(args.hand_time, '%Y/%m/%d %H:%M:%S')
+        except Exception:
+            hand_time = args.hand_time
     elif args.log_file:
         hand_time = datetime.datetime.fromtimestamp(os.stat(args.log_file).st_mtime)
     else:
