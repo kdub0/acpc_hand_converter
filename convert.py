@@ -62,12 +62,6 @@ def parse_HandHistory(line, freeze_out=False, stack_size=20000, blinds=[50, 100]
         except Exception as e:
             pass
 
-    if comment.startswith('WM '):
-        try:
-            time = datetime.datetime.fromtimestamp(float(comment[3:]))
-        except Exception as e:
-            pass
-
     return HandHistory(index, betting, hands, board, outcome, players, time, stacks, blinds)
 
 
