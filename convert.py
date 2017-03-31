@@ -2,7 +2,7 @@ import argparse, collections, datetime, itertools, os, rank, re, sys
 
 HandHistory = collections.namedtuple(
         'HandHistory',
-        ['index', 'betting', 'hands', 'board', 'outcome', 'players', 'time', 'stacks', 'blinds']
+        ['index', 'betting', 'hands', 'board', 'outcome', 'players', 'time', 'stacks', 'blinds'],
 )
 
 def parse_HandHistory(line, freeze_out=False, stack_size=20000, blinds=[50, 100]):
@@ -12,7 +12,7 @@ def parse_HandHistory(line, freeze_out=False, stack_size=20000, blinds=[50, 100]
     comment_start = line.find('#')
     if comment_start >= 0:
         comment = line[comment_start+1:].strip()
-        line = line[0:comment_start].strip('#')
+        line = line[0:comment_start-1]
     else:
         comment = ''
 
@@ -30,8 +30,6 @@ def parse_HandHistory(line, freeze_out=False, stack_size=20000, blinds=[50, 100]
 
     if len(fields) != num_fields:
         raise RuntimeError('Incorrect number of fields')
-
-    time = None
 
     if freeze_out:
         stacks = [int(x) for x in fields[2].split('|')]
@@ -57,13 +55,35 @@ def parse_HandHistory(line, freeze_out=False, stack_size=20000, blinds=[50, 100]
     hands = [cards(x) for x in hands]
     board = [cards(x) for x in board]
 
+    time = None
     if comment != '':
         try:
             time = datetime.datetime.fromtimestamp(float(comment))
         except Exception as e:
             pass
 
+    if comment.startswith('WM '):
+        try:
+            time = datetime.datetime.fromtimestamp(float(comment[3:]))
+        except Exception as e:
+            pass
+
     return HandHistory(index, betting, hands, board, outcome, players, time, stacks, blinds)
+
+
+def convert_to_et(uct_datetime):
+        # from (http://stackoverflow.com/questions/11710469/how-to-get-python-to-display-current-time-eastern)
+        t = uct_datetime + datetime.timedelta(hours=-5)
+        # daylight savings starts on 2nd Sunday of March
+        d = datetime.datetime(t.year, 3, 8)
+        dston = d + datetime.timedelta(days=6-d.weekday())
+        # daylight savings stops on 1st Sunday of Nov
+        d = datetime.datetime(t.year, 11, 1)
+        dstoff = d + datetime.timedelta(days=6-d.weekday())
+        if dston <= t.replace(tzinfo=None) < dstoff:
+            t += datetime.timedelta(hours=1)
+        return t
+
 
 def main():
     parser = argparse.ArgumentParser(description='convert ACPC hand histories to PokerStars format')
@@ -78,6 +98,10 @@ def main():
     parser.add_argument(
             '--hand_time', type=str, default=None,
             help='Time hands took place'
+    )
+    parser.add_argument(
+            '--hand_time_offset', type=float, default=0.0,
+            help='Number of hours to add to hand time.  Useful when dealer\'s clock is not set in UCT.  Does not have to be interal.'
     )
     parser.add_argument(
             '--hero', type=str, default=None,
@@ -126,18 +150,9 @@ def main():
     elif args.log_file:
         hand_time = datetime.datetime.fromtimestamp(os.stat(args.log_file).st_mtime)
     else:
-        # convert to Eastern Time
-        # from (http://stackoverflow.com/questions/11710469/how-to-get-python-to-display-current-time-eastern)
-        t = datetime.datetime.utcnow() + datetime.timedelta(hours=-5)
-        # daylight savings starts on 2nd Sunday of March
-        d = datetime.datetime(t.year, 3, 8)
-        dston = d + datetime.timedelta(days=6-d.weekday())
-        # daylight savings stops on 1st Sunday of Nov
-        d = datetime.datetime(t.year, 11, 1)
-        dstoff = d + datetime.timedelta(days=6-d.weekday())
-        if dston <= t.replace(tzinfo=None) < dstoff:
-            t += datetime.timedelta(hours=1)
-        hand_time = t
+        hand_time = convert_to_et(datetime.datetime.utcnow())
+
+    hand_time_offset = datetime.timedelta(hours=args.hand_time_offset)
 
     if args.log_file:
         log_file = open(args.log_file, 'r')
@@ -154,10 +169,10 @@ def main():
         hand = parse_HandHistory(line, freeze_out=args.freeze_out, stack_size=args.stack_size, blinds=[args.small_blind, args.big_blind])
         if hand:
             if hand.time is not None:
-                hand_time = hand.time
+                hand_time = convert_to_et(hand.time)
 
             if isinstance(hand_time, datetime.datetime):
-                hand_time_str = hand_time.strftime('%Y/%m/%d %H:%M:%S ET')
+                hand_time_str = (hand_time + hand_time_offset).strftime('%Y/%m/%d %H:%M:%S ET')
                 hand_time += datetime.timedelta(minutes=1)
             else:
                 hand_time_str = hand_time
