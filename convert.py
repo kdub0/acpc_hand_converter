@@ -194,11 +194,39 @@ def main():
                     1 + dealer
             )
 
+            pot = [
+                min(hand.blinds[1], hand.stacks[1-dealer]),
+                min(hand.blinds[0], hand.stacks[dealer]),
+            ]
+
             print 'Seat 1: %s ($%d in chips)' % (players[0], hand.stacks[1-dealer])
             print 'Seat 2: %s ($%d in chips)' % (players[1], hand.stacks[dealer])
 
-            print '%s: posts small blind $%d' % (hand_players[1], hand.blinds[0])
-            print '%s: posts big blind $%d' % (hand_players[0], hand.blinds[1])
+            sb_all_in = hand.stacks[dealer] <= hand.blinds[0]
+            print '%s: posts small blind $%d%s' % (
+                hand_players[1], pot[1],
+                ' and is all-in' if sb_all_in else ''
+            )
+
+            bb_all_in = hand.stacks[1-dealer] <= hand.blinds[1]
+            print '%s: posts big blind $%d%s' % (
+                hand_players[0], pot[0],
+                ' and is all-in' if bb_all_in else ''
+            )
+
+            if min(hand.stacks[0], hand.stacks[1]) <= hand.blinds[0]:
+                if hand.stacks[dealer] < hand.stacks[1-dealer]:
+                    print 'Uncalled bet ($%d) returned to %s' % (
+                            min(hand.blinds[1], hand.stacks[1-dealer]) - min(hand.stacks[0], hand.stacks[1]),
+                            hand_players[1-dealer]
+                    )
+                elif hand.stacks[1-dealer] < hand.stacks[dealer]:
+                    print 'Uncalled bet ($%d) returned to %s' % (
+                            min(hand.blinds[0], hand.stacks[dealer]) - min(hand.stacks[0], hand.stacks[1]),
+                            hand_players[dealer]
+                    )
+                hand.betting[0] = ''
+                caller = 1
 
             print '*** HOLE CARDS ***'
             if hero is not None:
@@ -295,7 +323,6 @@ def main():
                     hand_players[opponent], opponent_outcome,
                     outcome)
 
-            pot = [hand.blinds[1], hand.blinds[0]]
             for rnd in range(1+len(hand.board)):
                 if rnd > 0:
                     print '*** %s **** [%s]' % (
