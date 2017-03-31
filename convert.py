@@ -94,6 +94,10 @@ def main():
             help='Time hands took place'
     )
     parser.add_argument(
+            '--hand_time_delta', type=float, default=60.0,
+            help='Number of seconds to add between hands'
+    )
+    parser.add_argument(
             '--hand_time_offset', type=float, default=0.0,
             help='Number of hours to add to hand time.  Useful when dealer\'s clock is not set in UCT.  Does not have to be interal.'
     )
@@ -149,6 +153,7 @@ def main():
     else:
         hand_time = convert_to_et(datetime.datetime.utcnow())
 
+    hand_time_delta = datetime.timedelta(seconds=args.hand_time_delta)
     hand_time_offset = datetime.timedelta(hours=args.hand_time_offset)
 
     if args.log_file:
@@ -170,7 +175,7 @@ def main():
 
             if isinstance(hand_time, datetime.datetime):
                 hand_time_str = (hand_time + hand_time_offset).strftime('%Y/%m/%d %H:%M:%S ET')
-                hand_time += datetime.timedelta(minutes=1)
+                hand_time += hand_time_delta
             else:
                 hand_time_str = hand_time
 
