@@ -387,7 +387,7 @@ def main():
                         else:
                             print '%s: calls $%d%s' % (
                                     hand_players[player],
-                                    pot[opponent] - pot[player],
+                                    min(pot[opponent] - pot[player], hand.stacks[player] - pot[player]),
                                     ' and is all-in' if pot[opponent] >= hand.stacks[player] else ''
                             )
                             if pot[opponent] > hand.stacks[player]:
