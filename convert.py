@@ -237,11 +237,13 @@ def main():
                             min(hand.blinds[1], hand.stacks[1-dealer]) - min(hand.stacks[0], hand.stacks[1]),
                             hand_players[1-dealer]
                     )
+                    pot[1-dealer] = hand.stacks[dealer]
                 elif hand.stacks[1-dealer] < hand.stacks[dealer]:
                     print 'Uncalled bet ($%d) returned to %s' % (
                             min(hand.blinds[0], hand.stacks[dealer]) - min(hand.stacks[0], hand.stacks[1]),
                             hand_players[dealer]
                     )
+                    pot[dealer] = hand.stacks[1-dealer]
                 hand.betting[0] = ''
                 caller = 1
 
@@ -395,6 +397,7 @@ def main():
                                         pot[opponent] - hand.stacks[player],
                                         hand_players[opponent]
                                 )
+                                pot[opponent] = hand.stacks[player]
                         pot[player] = min(hand.stacks[player], pot[opponent])
                         caller = player
 
